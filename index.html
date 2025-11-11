@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rebate Calendar Calculator</title>
+<style>
+  body { font-family: Arial, sans-serif; padding: 20px; background-color: #f8f8f8; }
+  h2 { color: #333; }
+  input, select, textarea { display: block; margin-bottom: 10px; width: 350px; padding: 6px; font-size: 14px; }
+  textarea { height: 150px; resize: vertical; }
+  button { padding: 10px 20px; font-size: 16px; cursor: pointer; background-color: #007BFF; color: white; border: none; border-radius: 4px; }
+  button:hover { background-color: #0056b3; }
+  table { border-collapse: collapse; margin-top: 20px; width: 100%; background: white; }
+  th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+  th { background-color: #f2f2f2; }
+  .valid-range { background-color: #c6efce; } /* green highlight for valid ranges */
+  td, th { word-break: break-word; }
+</style>
+</head>
+<body>
+
+<h2>Rebate Calendar Calculator</h2>
+
+<label for="rebateDate">1. Rebate Date (YYYY-MM-DD HH:MM:SS)</label>
+<input type="text" id="rebateDate" placeholder="2025-04-11 01:12:41">
+
+<label for="tier">2. Tier</label>
+<select id="tier">
+  <option value="2">Tier 2 (7 days)</option>
+  <option value="3">Tier 3 (9 days)</option>
+</select>
+
+<label for="purchaseDates">3. Purchase Dates (one per line, YYYY-MM-DD HH:MM:SS)</label>
+<textarea id="purchaseDates" placeholder="2025-04-11 07:30:00&#10;2025-04-11 09:00:00"></textarea>
+
+<button onclick="calculate()">Calculate</button>
+
+<h3>4. Result</h3>
+<div id="result"></div>
+
+<script>
+function calculate() {
+  const rebateInput = document.getElementById("rebateDate").value.trim();
+  const tier = parseInt(document.getElementById("tier").value);
+  const purchasesRaw = document.getElementById("purchaseDates").value.trim();
+
+  if (!rebateInput || !purchasesRaw) return alert("Please enter all fields.");
+
+  let rebateDate = new Date(rebateInput.replace(" ", "T"));
+  if (isNaN(rebateDate)) return alert("Invalid rebate date format.");
+
+  const periodDays = tier === 2 ? 7 : 9;
+
+  const purchaseLines = purchasesRaw.split(/\n+/).map(line => line.trim()).filter(line => line);
+  const purchaseDates = purchaseLines.map(line => new Date(line.replace(" ", "T"))).filter(dt => !isNaN(dt));
+
+  if (purchaseDates.length === 0) return alert("No valid purchase dates.");
+
+  purchaseDates.sort((a,b) => a - b);
+  const maxPurchaseDate = purchaseDates[purchaseDates.length - 1];
+
+  let rangeStart = new Date(rebateDate);
+  const results = [];
+
+  function getDayKey(date) {
+    const totalSeconds = date.getHours()*3600 + date.getMinutes()*60 + date.getSeconds();
+    const cutoffSeconds = 8*3600; // 08:00:00
+    let adjustedDate = new Date(date);
+    if (totalSeconds < cutoffSeconds) adjustedDate.setDate(adjustedDate.getDate() - 1);
+    return adjustedDate.getFullYear() + '-' + (adjustedDate.getMonth()+1).toString().padStart(2,'0') + '-' + adjustedDate.getDate().toString().padStart(2,'0');
+  }
+
+  while (rangeStart <= maxPurchaseDate) {
+    // Range end: periodDays later at 08:00:00
+    let rangeEnd = new Date(rangeStart);
+    rangeEnd.setDate(rangeEnd.getDate() + periodDays);
+    rangeEnd.setHours(8,0,0,0);
+
+    const dayCounts = {};
+
+    for (let dt of purchaseDates) {
+      if (dt >= rangeStart && dt < rangeEnd) {
+        const dayStr = getDayKey(dt);
+        dayCounts[dayStr] = 1; // unique days only
+      }
+    }
+
+    const totalPurchases = Object.keys(dayCounts).length;
+
+    results.push({
+      start: new Date(rangeStart),
+      end: new Date(rangeEnd),
+      uniqueDays: Object.keys(dayCounts).sort(),
+      totalPurchases
+    });
+
+    // Next range starts at previous range end
+    rangeStart = new Date(rangeEnd);
+  }
+
+  // Build summary table
+  let tableHTML = '<table><tr><th>Range Start</th><th>Range End (08:00:00)</th><th>Unique Days</th><th>Total Unique Days</th></tr>';
+
+  results.forEach(r => {
+    const highlightClass = r.totalPurchases > 0 ? 'valid-range' : '';
+    tableHTML += `<tr class="${highlightClass}">
+      <td>${r.start.toLocaleString()}</td>
+      <td>${r.end.getFullYear()}-${(r.end.getMonth()+1).toString().padStart(2,'0')}-${r.end.getDate().toString().padStart(2,'0')} 08:00:00</td>
+      <td>${r.uniqueDays.join('<br>') || '-'}</td>
+      <td>${r.totalPurchases}</td>
+    </tr>`;
+  });
+
+  tableHTML += '</table>';
+  document.getElementById("result").innerHTML = tableHTML;
+}
+</script>
+
+</body>
+</html>
