@@ -1,3 +1,4 @@
+<script>
 function calculate() {
   const rebateInput = document.getElementById("rebateDate").value.trim();
   const tier = parseInt(document.getElementById("tier").value);
@@ -22,15 +23,21 @@ function calculate() {
   const results = [];
 
   function getDayKey(date) {
-    const totalSeconds = date.getHours()*3600 + date.getMinutes()*60 + date.getSeconds();
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const seconds = date.getSeconds();
+    const totalSeconds = hours*3600 + minutes*60 + seconds;
+
     const cutoffSeconds = 8*3600; // 08:00:00
     let adjustedDate = new Date(date);
-    if (totalSeconds < cutoffSeconds) adjustedDate.setDate(adjustedDate.getDate() - 1);
-    return adjustedDate.getFullYear() + '-' + (adjustedDate.getMonth()+1).toString().padStart(2,'0') + '-' + adjustedDate.getDate().toString().padStart(2,'0');
+    if (totalSeconds < cutoffSeconds) {
+      adjustedDate.setDate(adjustedDate.getDate() - 1);
+    }
+    return adjustedDate.getFullYear() + '-' + (adjustedDate.getMonth() + 1).toString().padStart(2,'0') + '-' + adjustedDate.getDate().toString().padStart(2,'0');
   }
 
   while (rangeStart <= maxPurchaseDate) {
-    // Range end: periodDays later at 08:00:00
+    // Range end is N days later at 08:00:00
     let rangeEnd = new Date(rangeStart);
     rangeEnd.setDate(rangeEnd.getDate() + periodDays);
     rangeEnd.setHours(8,0,0,0);
@@ -40,36 +47,36 @@ function calculate() {
     for (let dt of purchaseDates) {
       if (dt >= rangeStart && dt < rangeEnd) {
         const dayStr = getDayKey(dt);
-        dayCounts[dayStr] = 1; // count **unique day** only
+        dayCounts[dayStr] = (dayCounts[dayStr] || 0) + 1;
       }
     }
-
-    const totalPurchases = Object.keys(dayCounts).length;
 
     results.push({
       start: new Date(rangeStart),
       end: new Date(rangeEnd),
-      uniqueDays: Object.keys(dayCounts).sort(),
-      totalPurchases
+      dayCounts
     });
 
-    // Next range starts at previous range end
+    // Next range starts exactly at previous range end
     rangeStart = new Date(rangeEnd);
   }
 
   // Build summary table
-  let tableHTML = '<table><tr><th>Range Start</th><th>Range End (08:00:00)</th><th>Unique Days</th><th>Total Unique Days</th></tr>';
+  let tableHTML = '<table><tr><th>Range Start</th><th>Range End (08:00:00)</th><th>Unique Days</th><th>Total Purchases</th></tr>';
 
   results.forEach(r => {
-    const highlightClass = r.totalPurchases > 0 ? 'valid-range' : '';
+    const uniqueDays = Object.keys(r.dayCounts).sort().join('<br>'); // ascending order
+    const totalPurchases = Object.values(r.dayCounts).reduce((a,b) => a+b, 0);
+    const highlightClass = totalPurchases > 0 ? 'valid-range' : '';
     tableHTML += `<tr class="${highlightClass}">
       <td>${r.start.toLocaleString()}</td>
-      <td>${r.end.getFullYear()}-${(r.end.getMonth()+1).toString().padStart(2,'0')}-${r.end.getDate().toString().padStart(2,'0')} 08:00:00</td>
-      <td>${r.uniqueDays.join('<br>') || '-'}</td>
-      <td>${r.totalPurchases}</td>
+      <td>${r.end.toLocaleString()}</td>
+      <td>${uniqueDays || '-'}</td>
+      <td>${totalPurchases}</td>
     </tr>`;
   });
 
   tableHTML += '</table>';
   document.getElementById("result").innerHTML = tableHTML;
 }
+</script>
