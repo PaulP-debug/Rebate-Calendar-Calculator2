@@ -11,39 +11,88 @@
   button { padding: 10px 20px; font-size: 16px; border-radius: 4px; border: none; margin-right: 10px; cursor: pointer; }
   table { border-collapse: collapse; margin-top: 10px; width: 100%; }
   th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-  .valid-range { background-color: #c6efce; } /* green highlight */
+  .valid-range { background-color: #c6efce; }
   #modeLabel { font-size: 18px; font-weight: bold; margin-top: 20px; }
+  #loginContainer { max-width: 400px; margin: 100px auto; text-align: center; border: 1px solid #ccc; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+  #loginContainer input { width: 90%; margin: 8px auto; padding: 8px; }
 </style>
 </head>
 <body>
 
-<h2>Rebate Calendar Calculator</h2>
+<!-- LOGIN SCREEN -->
+<div id="loginContainer">
+  <h2>Login</h2>
+  <p>Enter your credentials to access the calculator:</p>
+  <input type="text" id="username" placeholder="Username">
+  <input type="password" id="password" placeholder="Password">
+  <button onclick="login()">Login</button>
+  <p id="loginMessage" style="color:red;"></p>
+</div>
 
-<label for="rebateDate">1. Rebate Date (YYYY-MM-DD HH:MM:SS)</label>
-<input type="text" id="rebateDate" placeholder="2025-11-14 01:12:41">
+<!-- MAIN APP -->
+<div id="appContainer" style="display:none;">
+  <h2>Rebate Calendar Calculator</h2>
 
-<label for="tier">2. Tier</label>
-<select id="tier">
-  <option value="2">Tier 2 (7 days)</option>
-  <option value="3">Tier 3 (9 days)</option>
-</select>
+  <label for="rebateDate">1. Rebate Date (YYYY-MM-DD HH:MM:SS)</label>
+  <input type="text" id="rebateDate" placeholder="2025-11-14 01:12:41">
 
-<label for="purchaseDates">3. Purchase Dates (one per line, YYYY-MM-DD HH:MM:SS)</label>
-<textarea id="purchaseDates" placeholder="2025-11-14 01:12:41&#10;2025-11-14 09:00:00"></textarea>
+  <label for="tier">2. Tier</label>
+  <select id="tier">
+    <option value="2">Tier 2 (7 days)</option>
+    <option value="3">Tier 3 (9 days)</option>
+  </select>
 
-<button id="calcBtnLegends" onclick="calculateLegends()" style="background-color:#8A2BE2; color:white;">
-  Calculate (LEGENDS)
-</button>
+  <label for="purchaseDates">3. Purchase Dates (one per line, YYYY-MM-DD HH:MM:SS)</label>
+  <textarea id="purchaseDates" placeholder="2025-11-14 01:12:41&#10;2025-11-14 09:00:00"></textarea>
 
-<button id="calcBtnAcorn" onclick="calculateAcorn()" style="background-color:#FFD700; color:black;">
-  Calculate (ACORN)
-</button>
+  <button id="calcBtnLegends" onclick="calculateLegends()" style="background-color:#8A2BE2; color:white;">
+    Calculate (LEGENDS)
+  </button>
 
-<h3>4. Result</h3>
-<div id="modeLabel"></div>
-<div id="result"></div>
+  <button id="calcBtnAcorn" onclick="calculateAcorn()" style="background-color:#FFD700; color:black;">
+    Calculate (ACORN)
+  </button>
+
+  <button onclick="logout()" style="background-color:#f44336; color:white;">Logout</button>
+
+  <h3>4. Result</h3>
+  <div id="modeLabel"></div>
+  <div id="result"></div>
+</div>
 
 <script>
+/* ---------- Pseudo Login ---------- */
+const LOGIN_USERNAME = "LEGENDS_ADMIN";
+const LOGIN_PASSWORD = "AcornLegends2025";
+
+function login() {
+  const user = document.getElementById("username").value.trim();
+  const pass = document.getElementById("password").value.trim();
+  const message = document.getElementById("loginMessage");
+
+  if (user === LOGIN_USERNAME && pass === LOGIN_PASSWORD) {
+    localStorage.setItem("loggedIn", "true");
+    showApp();
+  } else {
+    message.textContent = "Invalid username or password.";
+  }
+}
+
+function showApp() {
+  document.getElementById("loginContainer").style.display = "none";
+  document.getElementById("appContainer").style.display = "block";
+}
+
+function logout() {
+  localStorage.removeItem("loggedIn");
+  location.reload();
+}
+
+// Auto-login if previously authenticated
+if (localStorage.getItem("loggedIn") === "true") {
+  showApp();
+}
+
 /* ---------- Utility to parse local datetime string ---------- */
 function parseLocalDate(str) {
   if(!str) return null;
@@ -63,7 +112,6 @@ function calculateLegends() {
   if (!rebateDate) return alert("Invalid rebate date format.");
 
   const periodDays = tier === 2 ? 7 : 9;
-
   const purchaseLines = purchasesRaw.split(/\n+/).map(line => line.trim()).filter(line => line);
   const purchaseDates = purchaseLines.map(parseLocalDate).filter(dt => dt);
   if (purchaseDates.length === 0) return alert("No valid purchase dates.");
@@ -79,7 +127,6 @@ function calculateLegends() {
     let rangeEnd;
 
     if(firstEvent){
-      // Legends first event special logic
       let firstDayEnd = new Date(rangeStart);
       if(rangeStart.getHours() < 8){
         firstDayEnd.setHours(8,0,0,0);
@@ -93,7 +140,6 @@ function calculateLegends() {
       rangeEnd.setHours(8,0,0,0);
       firstEvent = false;
     } else {
-      // Subsequent events start at 08:00 and run full periodDays
       rangeEnd = new Date(rangeStart);
       rangeEnd.setDate(rangeEnd.getDate() + periodDays);
       rangeEnd.setHours(8,0,0,0);
@@ -135,7 +181,6 @@ function calculateAcorn() {
   if (!rebateDate) return alert("Invalid rebate date format.");
 
   const periodDays = tier === 2 ? 7 : 9;
-
   const purchaseLines = purchasesRaw.split(/\n+/).map(line => line.trim()).filter(line => line);
   const purchaseDates = purchaseLines.map(parseLocalDate).filter(dt => dt);
   if (purchaseDates.length === 0) return alert("No valid purchase dates.");
@@ -148,7 +193,7 @@ function calculateAcorn() {
 
   while(rangeStart <= lastPurchaseDate){
     let rangeEnd = new Date(rangeStart);
-    rangeEnd.setDate(rangeEnd.getDate() + periodDays); // 24-hour ranges, no 08:00 snap
+    rangeEnd.setDate(rangeEnd.getDate() + periodDays);
 
     const dayCounts = {};
     for(let dt of purchaseDates){
