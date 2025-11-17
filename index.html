@@ -176,12 +176,12 @@ function calculateAcorn() {
         let dayIndex=Math.floor(diff/(24*3600*1000));
         let dayStart=new Date(rebateDate.getTime()+dayIndex*24*3600*1000);
         let dayEnd=new Date(dayStart.getTime()+24*3600*1000);
-        // If purchase happens before the exact cutoff (e.g., 2025-05-12 01:05:41 < 2025-05-12 01:12:41)
+
         if(dt < dayEnd && dt < new Date(rebateDate.getTime()+(dayIndex+1)*24*3600*1000 - (24*60*60*1000 - (dt - dayStart)))) {
-          // still counts toward previous cycle
           if(dt < dayEnd) dayIndex--;
         }
         if(dayIndex<0) dayIndex=0;
+
         const dayLabel=new Date(rebateDate);
         dayLabel.setDate(rebateDate.getDate()+dayIndex);
         const label=`${dayLabel.getFullYear()}-${String(dayLabel.getMonth()+1).padStart(2,'0')}-${String(dayLabel.getDate()).padStart(2,'0')}`;
@@ -214,5 +214,11 @@ function renderTable(results, color, mode){
   ths.forEach(th=>{th.style.backgroundColor=color;th.style.color='white';});
 }
 </script>
+
+<!-- ⭐ Signature added here -->
+<p style="text-align:right; font-style:italic; margin-top:40px; opacity:0.8;">
+  — by: Paul Angelo P
+</p>
+
 </body>
 </html>
