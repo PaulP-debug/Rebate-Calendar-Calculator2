@@ -204,35 +204,37 @@ function renderTable(results, color, mode){
     displayMode = "OLD_LEGENDS (UPDATED - Only use for rebate inquiry before 12-12-2025)";
   } else if(mode === "ACORN") {
     displayMode = "ACORN + LEGENDS";
-    color = "#FFFF99"; // light yellow
+    color = "#FFFF00"; // bright yellow for table header
   }
 
-  document.getElementById("modeLabel").innerHTML=`<span style="color:${color}">Results — ${displayMode} Mode</span>`;
+  // Mode label: black text for ACORN + LEGENDS
+  const modeLabelColor = mode === "ACORN" ? 'black' : color;
+  document.getElementById("modeLabel").innerHTML = `<span style="color:${modeLabelColor}">Results — ${displayMode} Mode</span>`;
 
-  let html='<table><tr><th>Range Start</th><th>Range End</th><th>Unique Days</th><th>Total Unique Days</th></tr>';
-  results.forEach(r=>{
-    const highlight=r.totalPurchases>0?'valid-range':'';
-    html+=`<tr class="${highlight}">
+  // Build table
+  let html = '<table><tr><th>Range Start</th><th>Range End</th><th>Unique Days</th><th>Total Unique Days</th></tr>';
+  results.forEach(r => {
+    const highlight = r.totalPurchases > 0 ? 'valid-range' : '';
+    html += `<tr class="${highlight}">
       <td>${format24h(r.start)}</td>
       <td>${format24h(r.end)}</td>
-      <td>${r.uniqueDays.join('<br>')||'-'}</td>
+      <td>${r.uniqueDays.join('<br>') || '-'}</td>
       <td>${r.totalPurchases}</td>
     </tr>`;
   });
-  html+='</table>';
-  document.getElementById("result").innerHTML=html;
-
-  const ths=document.querySelectorAll("#result th");
-  const tds=document.querySelectorAll("#result td");
+  html += '</table>';
+  document.getElementById("result").innerHTML = html;
 
   // Table header styling
-  ths.forEach(th=>{
-    th.style.backgroundColor=color;
+  const ths = document.querySelectorAll("#result th");
+  ths.forEach(th => {
+    th.style.backgroundColor = color;
     th.style.color = mode === "ACORN" ? 'black' : 'white';
   });
 
   // Table body text color for ACORN + LEGENDS
   if(mode === "ACORN") {
+    const tds = document.querySelectorAll("#result td");
     tds.forEach(td => td.style.color = 'black');
   }
 }
