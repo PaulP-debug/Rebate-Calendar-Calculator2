@@ -46,8 +46,7 @@
   <label for="purchaseDates">3. Purchase Dates (one per line, YYYY-MM-DD HH:MM:SS)</label>
   <textarea id="purchaseDates" placeholder="2025-11-14 01:12:41&#10;2025-11-14 09:00:00"></textarea>
 
-  <button onclick="calculateLegends()" style="background-color:#8A2BE2; color:white;">Calculate (LEGENDS)</button>
-  <button onclick="calculateAcorn()" style="background-color:#FFD700; color:black;">Calculate (ACORN)</button>
+  <button onclick="calculateAcorn()" style="background-color:#FFD700; color:black;">Calculate (LEGENDS + ACORN)</button>
   <button onclick="logout()" style="background-color:#f44336; color:white;">Logout</button>
 
   <h3>4. Result</h3>
@@ -75,6 +74,7 @@ if (localStorage.getItem("loggedIn") === "true") {
   document.getElementById("loginContainer").style.display = "none";
   document.getElementById("appContainer").style.display = "block";
 }
+
 function logout() {
   localStorage.removeItem("loggedIn");
   location.reload();
@@ -98,58 +98,7 @@ function format24h(dt) {
   return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
 }
 
-/* ---------- LEGENDS MODE ---------- */
-function calculateLegends() {
-  const rebateInput = document.getElementById("rebateDate").value.trim();
-  const tier = parseInt(document.getElementById("tier").value);
-  const purchasesRaw = document.getElementById("purchaseDates").value.trim();
-  if (!rebateInput || !purchasesRaw) return alert("Please enter all fields.");
-
-  let rebateDate = parseLocalDate(rebateInput);
-  if (!rebateDate) return alert("Invalid rebate date format.");
-  const periodDays = tier === 2 ? 7 : 9;
-  const purchaseDates = purchasesRaw.split(/\n+/).map(parseLocalDate).filter(Boolean).sort((a,b)=>a-b);
-  const lastPurchase = purchaseDates[purchaseDates.length-1];
-
-  let results = [];
-  let rangeStart = new Date(rebateDate);
-  let firstEvent = true;
-  while(rangeStart <= lastPurchase){
-    let rangeEnd;
-    if(firstEvent){
-      rangeEnd = new Date(rangeStart);
-      if(rangeStart.getHours()<8){
-        rangeEnd.setHours(8,0,0,0);
-      } else {
-        rangeEnd.setDate(rangeEnd.getDate()+1);
-        rangeEnd.setHours(8,0,0,0);
-      }
-      rangeEnd.setDate(rangeEnd.getDate()+(periodDays-1));
-      firstEvent=false;
-    } else {
-      rangeEnd = new Date(rangeStart);
-      rangeEnd.setDate(rangeEnd.getDate()+periodDays);
-      rangeEnd.setHours(8,0,0,0);
-    }
-
-    const dayCounts={};
-    const cutoff=8*3600;
-    for(let dt of purchaseDates){
-      if(dt>=rangeStart && dt<rangeEnd){
-        let adjusted=new Date(dt);
-        const sec=dt.getHours()*3600+dt.getMinutes()*60+dt.getSeconds();
-        if(sec<cutoff) adjusted.setDate(adjusted.getDate()-1);
-        const key=`${adjusted.getFullYear()}-${String(adjusted.getMonth()+1).padStart(2,'0')}-${String(adjusted.getDate()).padStart(2,'0')}`;
-        dayCounts[key]=1;
-      }
-    }
-    results.push({start:new Date(rangeStart), end:new Date(rangeEnd), uniqueDays:Object.keys(dayCounts).sort(), totalPurchases:Object.keys(dayCounts).length});
-    rangeStart=new Date(rangeEnd);
-  }
-  renderTable(results,"#8A2BE2","LEGENDS");
-}
-
-/* ---------- ACORN MODE ---------- */
+/* ---------- ACORN MODE (Now: Legends + Acorn) ---------- */
 function calculateAcorn() {
   const rebateInput=document.getElementById("rebateDate").value.trim();
   const tier=parseInt(document.getElementById("tier").value);
@@ -165,6 +114,7 @@ function calculateAcorn() {
 
   let results=[];
   let rangeStart=new Date(rebateDate);
+
   while(rangeStart<=lastPurchase){
     let rangeEnd=new Date(rangeStart);
     rangeEnd.setDate(rangeEnd.getDate()+periodDays);
@@ -189,10 +139,17 @@ function calculateAcorn() {
       }
     }
 
-    results.push({start:new Date(rangeStart), end:new Date(rangeEnd), uniqueDays:Object.keys(dayCounts).sort(), totalPurchases:Object.keys(dayCounts).length});
+    results.push({
+      start:new Date(rangeStart),
+      end:new Date(rangeEnd),
+      uniqueDays:Object.keys(dayCounts).sort(),
+      totalPurchases:Object.keys(dayCounts).length
+    });
+
     rangeStart=new Date(rangeEnd);
   }
-  renderTable(results,"#FFD700","ACORN");
+
+  renderTable(results,"#FFD700","LEGENDS + ACORN");
 }
 
 /* ---------- RENDER ---------- */
@@ -210,12 +167,13 @@ function renderTable(results, color, mode){
   });
   html+='</table>';
   document.getElementById("result").innerHTML=html;
+
   const ths=document.querySelectorAll("#result th");
   ths.forEach(th=>{th.style.backgroundColor=color;th.style.color='white';});
 }
 </script>
 
-<!-- ⭐ Signature added here -->
+<!-- ⭐ Signature -->
 <p style="text-align:right; font-style:italic; margin-top:40px; opacity:0.8;">
   — by: Paul P
 </p>
