@@ -46,7 +46,9 @@
   <label for="purchaseDates">3. Purchase Dates (one per line, YYYY-MM-DD HH:MM:SS)</label>
   <textarea id="purchaseDates" placeholder="2025-11-14 01:12:41&#10;2025-11-14 09:00:00"></textarea>
 
-  <button onclick="calculateAcorn()" style="background-color:#FFD700; color:black;">Calculate (LEGENDS + ACORN)</button>
+  <!-- Swapped and renamed buttons -->
+  <button onclick="calculateAcorn()" style="background-color:#FFD700; color:black;">Calculate (ACORN + LEGENDS)</button>
+  <button onclick="calculateLegends()" style="background-color:#8A2BE2; color:white;">Calculate (OLD_LEGENDS)</button>
   <button onclick="logout()" style="background-color:#f44336; color:white;">Logout</button>
 
   <h3>4. Result</h3>
@@ -74,7 +76,6 @@ if (localStorage.getItem("loggedIn") === "true") {
   document.getElementById("loginContainer").style.display = "none";
   document.getElementById("appContainer").style.display = "block";
 }
-
 function logout() {
   localStorage.removeItem("loggedIn");
   location.reload();
@@ -98,7 +99,58 @@ function format24h(dt) {
   return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
 }
 
-/* ---------- ACORN MODE (Now: Legends + Acorn) ---------- */
+/* ---------- LEGENDS MODE ---------- */
+function calculateLegends() {
+  const rebateInput = document.getElementById("rebateDate").value.trim();
+  const tier = parseInt(document.getElementById("tier").value);
+  const purchasesRaw = document.getElementById("purchaseDates").value.trim();
+  if (!rebateInput || !purchasesRaw) return alert("Please enter all fields.");
+
+  let rebateDate = parseLocalDate(rebateInput);
+  if (!rebateDate) return alert("Invalid rebate date format.");
+  const periodDays = tier === 2 ? 7 : 9;
+  const purchaseDates = purchasesRaw.split(/\n+/).map(parseLocalDate).filter(Boolean).sort((a,b)=>a-b);
+  const lastPurchase = purchaseDates[purchaseDates.length-1];
+
+  let results = [];
+  let rangeStart = new Date(rebateDate);
+  let firstEvent = true;
+  while(rangeStart <= lastPurchase){
+    let rangeEnd;
+    if(firstEvent){
+      rangeEnd = new Date(rangeStart);
+      if(rangeStart.getHours()<8){
+        rangeEnd.setHours(8,0,0,0);
+      } else {
+        rangeEnd.setDate(rangeEnd.getDate()+1);
+        rangeEnd.setHours(8,0,0,0);
+      }
+      rangeEnd.setDate(rangeEnd.getDate()+(periodDays-1));
+      firstEvent=false;
+    } else {
+      rangeEnd = new Date(rangeStart);
+      rangeEnd.setDate(rangeEnd.getDate()+periodDays);
+      rangeEnd.setHours(8,0,0,0);
+    }
+
+    const dayCounts={};
+    const cutoff=8*3600;
+    for(let dt of purchaseDates){
+      if(dt>=rangeStart && dt<rangeEnd){
+        let adjusted=new Date(dt);
+        const sec=dt.getHours()*3600+dt.getMinutes()*60+dt.getSeconds();
+        if(sec<cutoff) adjusted.setDate(adjusted.getDate()-1);
+        const key=`${adjusted.getFullYear()}-${String(adjusted.getMonth()+1).padStart(2,'0')}-${String(adjusted.getDate()).padStart(2,'0')}`;
+        dayCounts[key]=1;
+      }
+    }
+    results.push({start:new Date(rangeStart), end:new Date(rangeEnd), uniqueDays:Object.keys(dayCounts).sort(), totalPurchases:Object.keys(dayCounts).length});
+    rangeStart=new Date(rangeEnd);
+  }
+  renderTable(results,"#8A2BE2","LEGENDS");
+}
+
+/* ---------- ACORN MODE ---------- */
 function calculateAcorn() {
   const rebateInput=document.getElementById("rebateDate").value.trim();
   const tier=parseInt(document.getElementById("tier").value);
@@ -114,7 +166,6 @@ function calculateAcorn() {
 
   let results=[];
   let rangeStart=new Date(rebateDate);
-
   while(rangeStart<=lastPurchase){
     let rangeEnd=new Date(rangeStart);
     rangeEnd.setDate(rangeEnd.getDate()+periodDays);
@@ -139,22 +190,25 @@ function calculateAcorn() {
       }
     }
 
-    results.push({
-      start:new Date(rangeStart),
-      end:new Date(rangeEnd),
-      uniqueDays:Object.keys(dayCounts).sort(),
-      totalPurchases:Object.keys(dayCounts).length
-    });
-
+    results.push({start:new Date(rangeStart), end:new Date(rangeEnd), uniqueDays:Object.keys(dayCounts).sort(), totalPurchases:Object.keys(dayCounts).length});
     rangeStart=new Date(rangeEnd);
   }
-
-  renderTable(results,"#FFD700","LEGENDS + ACORN");
+  renderTable(results,"#FFD700","ACORN");
 }
 
 /* ---------- RENDER ---------- */
 function renderTable(results, color, mode){
-  document.getElementById("modeLabel").innerHTML=`<span style="color:${color}">Results — ${mode} Mode</span>`;
+  let displayMode = mode;
+
+  if(mode === "LEGENDS") {
+    displayMode = "OLD_LEGENDS (UPDATED - Only use for rebate inquiry before 12-12-2025)";
+  } else if(mode === "ACORN") {
+    displayMode = "ACORN + LEGENDS";
+    color = "#FFFF99"; // light yellow
+  }
+
+  document.getElementById("modeLabel").innerHTML=`<span style="color:${color}">Results — ${displayMode} Mode</span>`;
+
   let html='<table><tr><th>Range Start</th><th>Range End</th><th>Unique Days</th><th>Total Unique Days</th></tr>';
   results.forEach(r=>{
     const highlight=r.totalPurchases>0?'valid-range':'';
@@ -169,11 +223,23 @@ function renderTable(results, color, mode){
   document.getElementById("result").innerHTML=html;
 
   const ths=document.querySelectorAll("#result th");
-  ths.forEach(th=>{th.style.backgroundColor=color;th.style.color='white';});
+  const tds=document.querySelectorAll("#result td");
+
+  // Table header styling
+  ths.forEach(th=>{
+    th.style.backgroundColor=color;
+    th.style.color = mode === "ACORN" ? 'black' : 'white';
+  });
+
+  // Table body text color for ACORN + LEGENDS
+  if(mode === "ACORN") {
+    tds.forEach(td => td.style.color = 'black');
+  }
 }
+
+/* ---------- Signature ---------- */
 </script>
 
-<!-- ⭐ Signature -->
 <p style="text-align:right; font-style:italic; margin-top:40px; opacity:0.8;">
   — by: Paul P
 </p>
