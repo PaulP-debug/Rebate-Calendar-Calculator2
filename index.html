@@ -9,11 +9,17 @@
   input, select, textarea { display: block; margin-bottom: 10px; width: 300px; padding: 5px; }
   textarea { height: 150px; }
   button { padding: 10px 20px; font-size: 16px; border-radius: 4px; border: none; margin-right: 10px; cursor: pointer; }
-  table { border-collapse: collapse; margin-top: 10px; width: 100%; }
+  table { border-collapse: collapse; width: 100%; }
   th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
   .valid-range { background-color: #c6efce; }
   #modeLabel { font-size: 18px; font-weight: bold; margin-top: 20px; }
+
   #loginContainer { text-align:center; margin-top:100px; }
+
+  /* Flex layout for calculator + timezone */
+  .flex-container { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+  .flex-child { flex: 1; min-width: 350px; }
+  .result-container { max-height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 5px; margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -31,29 +37,40 @@
 
 <!-- 🔧 MAIN APP CONTENT -->
 <div id="appContainer" style="display:none;">
-
   <h2>Rebate Calendar Calculator</h2>
 
-  <label for="rebateDate">1. Rebate Date (YYYY-MM-DD HH:MM:SS)</label>
-  <input type="text" id="rebateDate" placeholder="2025-11-14 01:12:41">
+  <div class="flex-container">
+    <!-- Left: Calculator -->
+    <div class="flex-child calculator-box">
+      <label for="rebateDate">1. Rebate Date (YYYY-MM-DD HH:MM:SS)</label>
+      <input type="text" id="rebateDate" placeholder="2025-11-14 01:12:41">
 
-  <label for="tier">2. Tier</label>
-  <select id="tier">
-    <option value="2">Tier 2 (7 days)</option>
-    <option value="3">Tier 3 (9 days)</option>
-  </select>
+      <label for="tier">2. Tier</label>
+      <select id="tier">
+        <option value="2">Tier 2 (7 days)</option>
+        <option value="3">Tier 3 (9 days)</option>
+      </select>
 
-  <label for="purchaseDates">3. Purchase Dates (one per line, YYYY-MM-DD HH:MM:SS)</label>
-  <textarea id="purchaseDates" placeholder="2025-11-14 01:12:41&#10;2025-11-14 09:00:00"></textarea>
+      <label for="purchaseDates">3. Purchase Dates (one per line, YYYY-MM-DD HH:MM:SS)</label>
+      <textarea id="purchaseDates" placeholder="2025-11-14 01:12:41&#10;2025-11-14 09:00:00"></textarea>
 
-  <!-- Swapped and renamed buttons, ACORN + LEGENDS button matches header color -->
-  <button onclick="calculateAcorn()" style="background-color:#FFFF00; color:black;">Calculate (ACORN + LEGENDS)</button>
-  <button onclick="calculateLegends()" style="background-color:#8A2BE2; color:white;">Calculate (OLD_LEGENDS)</button>
-  <button onclick="logout()" style="background-color:#f44336; color:white;">Logout</button>
+      <button onclick="calculateAcorn()" style="background-color:#FFFF00; color:black;">Calculate (ACORN + LEGENDS)</button>
+      <button onclick="calculateLegends()" style="background-color:#8A2BE2; color:white;">Calculate (OLD_LEGENDS)</button>
+      <button onclick="logout()" style="background-color:#f44336; color:white;">Logout</button>
 
-  <h3>4. Result</h3>
-  <div id="modeLabel"></div>
-  <div id="result"></div>
+      <h3>4. Result</h3>
+      <div id="modeLabel"></div>
+      <div class="result-container" id="result"></div>
+    </div>
+
+    <!-- Right: Timezone Converter -->
+    <div class="flex-child">
+      <h3>5. Timezone Converter (Input UTC)</h3>
+      <label for="timezoneInput">Backend Time (YYYY-MM-DD HH:MM:SS)</label>
+      <input type="text" id="timezoneInput" placeholder="2025-11-14 01:12:41" oninput="updateTimezones()">
+      <div class="result-container" id="timezoneResult"></div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -76,6 +93,7 @@ if (localStorage.getItem("loggedIn") === "true") {
   document.getElementById("loginContainer").style.display = "none";
   document.getElementById("appContainer").style.display = "block";
 }
+
 function logout() {
   localStorage.removeItem("loggedIn");
   location.reload();
@@ -164,32 +182,21 @@ function calculateAcorn() {
   const purchaseDates=purchasesRaw.split(/\n+/).map(parseLocalDate).filter(Boolean).sort((a,b)=>a-b);
   const lastPurchase=purchaseDates[purchaseDates.length-1];
 
-  let results=[];
-  let rangeStart=new Date(rebateDate);
+  let results=[]; let rangeStart=new Date(rebateDate);
   while(rangeStart<=lastPurchase){
-    let rangeEnd=new Date(rangeStart);
-    rangeEnd.setDate(rangeEnd.getDate()+periodDays);
-
+    let rangeEnd=new Date(rangeStart); rangeEnd.setDate(rangeEnd.getDate()+periodDays);
     const dayCounts={};
     for(let dt of purchaseDates){
       if(dt>=rangeStart && dt<rangeEnd){
         let diff=dt - rebateDate;
         let dayIndex=Math.floor(diff/(24*3600*1000));
-        let dayStart=new Date(rebateDate.getTime()+dayIndex*24*3600*1000);
-        let dayEnd=new Date(dayStart.getTime()+24*3600*1000);
-
-        if(dt < dayEnd && dt < new Date(rebateDate.getTime()+(dayIndex+1)*24*3600*1000 - (24*60*60*1000 - (dt - dayStart)))) {
-          if(dt < dayEnd) dayIndex--;
-        }
         if(dayIndex<0) dayIndex=0;
-
         const dayLabel=new Date(rebateDate);
         dayLabel.setDate(rebateDate.getDate()+dayIndex);
         const label=`${dayLabel.getFullYear()}-${String(dayLabel.getMonth()+1).padStart(2,'0')}-${String(dayLabel.getDate()).padStart(2,'0')}`;
         dayCounts[label]=1;
       }
     }
-
     results.push({start:new Date(rangeStart), end:new Date(rangeEnd), uniqueDays:Object.keys(dayCounts).sort(), totalPurchases:Object.keys(dayCounts).length});
     rangeStart=new Date(rangeEnd);
   }
@@ -199,52 +206,58 @@ function calculateAcorn() {
 /* ---------- RENDER ---------- */
 function renderTable(results, color, mode){
   let displayMode = mode;
+  if(mode === "LEGENDS") displayMode = "OLD_LEGENDS (UPDATED - Only use for rebate inquiry before 12-12-2025)";
+  else if(mode === "ACORN") { displayMode = "ACORN + LEGENDS"; color="#FFFF00"; }
 
-  if(mode === "LEGENDS") {
-    displayMode = "OLD_LEGENDS (UPDATED - Only use for rebate inquiry before 12-12-2025)";
-  } else if(mode === "ACORN") {
-    displayMode = "ACORN + LEGENDS";
-    color = "#FFFF00"; // bright yellow for table header
-  }
-
-  // Mode label: black text for ACORN + LEGENDS
   const modeLabelColor = mode === "ACORN" ? 'black' : color;
   document.getElementById("modeLabel").innerHTML = `<span style="color:${modeLabelColor}">Results — ${displayMode} Mode</span>`;
 
-  // Build table
   let html = '<table><tr><th>Range Start</th><th>Range End</th><th>Unique Days</th><th>Total Unique Days</th></tr>';
   results.forEach(r => {
-    const highlight = r.totalPurchases > 0 ? 'valid-range' : '';
+    const highlight = r.totalPurchases>0?'valid-range':'';
     html += `<tr class="${highlight}">
       <td>${format24h(r.start)}</td>
       <td>${format24h(r.end)}</td>
-      <td>${r.uniqueDays.join('<br>') || '-'}</td>
+      <td>${r.uniqueDays.join('<br>')||'-'}</td>
       <td>${r.totalPurchases}</td>
     </tr>`;
   });
   html += '</table>';
   document.getElementById("result").innerHTML = html;
 
-  // Table header styling
   const ths = document.querySelectorAll("#result th");
-  ths.forEach(th => {
-    th.style.backgroundColor = color;
-    th.style.color = mode === "ACORN" ? 'black' : 'white';
-  });
-
-  // Table body text color for ACORN + LEGENDS
-  if(mode === "ACORN") {
-    const tds = document.querySelectorAll("#result td");
-    tds.forEach(td => td.style.color = 'black');
-  }
+  ths.forEach(th=>{ th.style.backgroundColor=color; th.style.color = mode==="ACORN"?'black':'white'; });
+  if(mode==="ACORN"){ document.querySelectorAll("#result td").forEach(td=>td.style.color='black'); }
 }
 
-/* ---------- Signature ---------- */
+/* ---------- TIMEZONE CONVERTER ---------- */
+function updateTimezones() {
+  const input = document.getElementById("timezoneInput").value.trim();
+  const dt = parseLocalDate(input);
+  if(!dt){ document.getElementById("timezoneResult").innerHTML="<p style='color:red;'>Invalid date format.</p>"; return; }
+
+  const zones = {
+    "PST (Server Time)": { offset:-8, color:'#cce5ff' },
+    "MST": { offset:-7, color:'#d4edda' },
+    "CST": { offset:-6, color:'#fff3cd' },
+    "EST": { offset:-5, color:'#ffe5b4' }
+  };
+
+  let html='<table style="border-collapse:collapse; width:100%;">';
+  html+='<tr style="background:#333;color:white;"><th>Timezone</th><th>Date & Time</th></tr>';
+  for(const tz in zones){
+    const localDate = new Date(dt.getTime() + zones[tz].offset*3600*1000);
+    const yyyy=localDate.getFullYear(), mm=String(localDate.getMonth()+1).padStart(2,'0');
+    const dd=String(localDate.getDate()).padStart(2,'0');
+    const hh=String(localDate.getHours()).padStart(2,'0');
+    const mi=String(localDate.getMinutes()).padStart(2,'0');
+    html+=`<tr style="background:${zones[tz].color};"><td>${tz}</td><td>${yyyy}-${mm}-${dd} ${hh}:${mi}</td></tr>`;
+  }
+  html+='</table>';
+  document.getElementById("timezoneResult").innerHTML=html;
+}
 </script>
 
-<p style="text-align:right; font-style:italic; margin-top:40px; opacity:0.8;">
-  — by: Paul P
-</p>
-
+<p style="text-align:right; font-style:italic; margin-top:40px; opacity:0.8;">— by: Paul P</p>
 </body>
 </html>
