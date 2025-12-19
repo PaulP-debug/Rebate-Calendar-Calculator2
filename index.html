@@ -18,9 +18,10 @@
   .flex-container { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
   .flex-child { flex: 1; min-width: 350px; }
 
-  /* Result box taller */
+  /* Result box taller and wider */
   .result-container {
-    max-height: 600px; /* increased from 400px */
+    width: 100%; /* full width under both columns */
+    max-height: 600px;
     overflow-y: auto;
     border: 1px solid #ccc;
     padding: 5px;
@@ -47,7 +48,7 @@
   <h2>Rebate Calendar Calculator</h2>
 
   <div class="flex-container">
-    <!-- Left: Rebate Calculator -->
+    <!-- Left: Rebate Calculator Inputs -->
     <div class="flex-child">
       <label for="rebateDate">1. Rebate Date (YYYY-MM-DD HH:MM:SS)</label>
       <input type="text" id="rebateDate" placeholder="2025-11-14 01:12:41">
@@ -65,10 +66,6 @@
       <button onclick="calculateAcorn()" style="background-color:#FFFF00; color:black;">Calculate (ACORN + LEGENDS)</button>
       <button onclick="calculateLegends()" style="background-color:#8A2BE2; color:white;">Calculate (OLD_LEGENDS)</button>
       <button onclick="logout()" style="background-color:#f44336; color:white;">Logout</button>
-
-      <h3>4. Result</h3>
-      <div id="modeLabel"></div>
-      <div id="result" class="result-container"></div>
     </div>
 
     <!-- Right: Timezone Converter -->
@@ -79,6 +76,11 @@
       <div id="timezoneResult" class="result-container"></div>
     </div>
   </div>
+
+  <!-- Rebate Calculator Result spans full width -->
+  <h3>4. Result</h3>
+  <div id="modeLabel"></div>
+  <div id="result" class="result-container"></div>
 </div>
 
 <script>
