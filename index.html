@@ -14,19 +14,9 @@
   .valid-range { background-color: #c6efce; }
   #modeLabel { font-size: 18px; font-weight: bold; margin-top: 20px; }
   #loginContainer { text-align:center; margin-top:100px; }
-
   .flex-container { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
   .flex-child { flex: 1; min-width: 350px; }
-
-  /* Result box taller and wider */
-  .result-container {
-    width: 100%; /* full width under both columns */
-    max-height: 600px;
-    overflow-y: auto;
-    border: 1px solid #ccc;
-    padding: 5px;
-    margin-top: 10px;
-  }
+  .result-container { width: 100%; max-height: 600px; overflow-y: auto; border: 1px solid #ccc; padding: 5px; margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -55,6 +45,7 @@
 
       <label for="tier">2. Tier</label>
       <select id="tier">
+        <option value="1">Tier 1 (5 days)</option>
         <option value="2">Tier 2 (7 days)</option>
         <option value="3">Tier 3 (9 days)</option>
       </select>
@@ -63,8 +54,15 @@
       <textarea id="purchaseDates" placeholder="2025-11-14 01:12:41&#10;2025-11-14 09:00:00"></textarea>
 
       <!-- Buttons -->
-      <button onclick="calculateAcorn()" style="background-color:#FFFF00; color:black;">Calculate (ACORN + LEGENDS)</button>
-      <button onclick="calculateLegends()" style="background-color:#8A2BE2; color:white;">Calculate (OLD_LEGENDS)</button>
+      <button onclick="calculateAcorn()" style="background-color:#FFFF00; color:black;">
+        Calculate (Acorn 24hours)
+      </button>
+      <button onclick="calculateMidnightReset()" style="background-color:#90EE90; color:black;">
+        Calculate (Midnight Reset + 24 hours)
+      </button>
+      <button onclick="calculateLegends()" style="background-color:#8A2BE2; color:white;">
+        Calculate (8am Reset)
+      </button>
       <button onclick="logout()" style="background-color:#f44336; color:white;">Logout</button>
     </div>
 
@@ -136,13 +134,15 @@ function calculateLegends() {
 
   let rebateDate = parseLocalDate(rebateInput);
   if (!rebateDate) return alert("Invalid rebate date format.");
-  const periodDays = tier === 2 ? 7 : 9;
+
+  const periodDays = tier === 1 ? 5 : tier === 2 ? 7 : 9;
   const purchaseDates = purchasesRaw.split(/\n+/).map(parseLocalDate).filter(Boolean).sort((a,b)=>a-b);
   const lastPurchase = purchaseDates[purchaseDates.length-1];
 
   let results = [];
   let rangeStart = new Date(rebateDate);
   let firstEvent = true;
+
   while(rangeStart <= lastPurchase){
     let rangeEnd;
     if(firstEvent){
@@ -187,7 +187,7 @@ function calculateAcorn() {
 
   const rebateDate=parseLocalDate(rebateInput);
   if(!rebateDate) return alert("Invalid rebate date format.");
-  const periodDays=tier===2?7:9;
+  const periodDays=tier===1?5:tier===2?7:9;
 
   const purchaseDates=purchasesRaw.split(/\n+/).map(parseLocalDate).filter(Boolean).sort((a,b)=>a-b);
   const lastPurchase=purchaseDates[purchaseDates.length-1];
@@ -214,16 +214,61 @@ function calculateAcorn() {
   renderTable(results,"#FFFF00","ACORN");
 }
 
+/* ---------- MIDNIGHT RESET + 24 HOURS MODE ---------- */
+function calculateMidnightReset() {
+  const rebateInput = document.getElementById("rebateDate").value.trim();
+  const tier = parseInt(document.getElementById("tier").value);
+  const purchasesRaw = document.getElementById("purchaseDates").value.trim();
+
+  if (!rebateInput || !purchasesRaw) return alert("Please enter all fields.");
+
+  const rebateDate = parseLocalDate(rebateInput);
+  if (!rebateDate) return alert("Invalid rebate date format.");
+
+  const periodDays = tier === 1 ? 5 : tier === 2 ? 7 : 9;
+  const purchaseDates = purchasesRaw.split(/\n+/).map(parseLocalDate).filter(Boolean).sort((a,b)=>a-b);
+  const lastPurchase = purchaseDates[purchaseDates.length - 1];
+
+  let results = [];
+  let rangeStart = new Date(rebateDate);
+
+  while (rangeStart <= lastPurchase) {
+    let rangeEnd = new Date(rangeStart);
+    rangeEnd.setDate(rangeEnd.getDate() + periodDays);
+
+    const dayCounts = {};
+
+    for (let dt of purchaseDates) {
+      if (dt >= rangeStart && dt < rangeEnd) {
+        const pst = new Date(dt.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+        const key =
+          pst.getFullYear() + "-" +
+          String(pst.getMonth() + 1).padStart(2, "0") + "-" +
+          String(pst.getDate()).padStart(2, "0");
+        dayCounts[key] = 1;
+      }
+    }
+
+    results.push({
+      start: new Date(rangeStart),
+      end: new Date(rangeEnd),
+      uniqueDays: Object.keys(dayCounts).sort(),
+      totalPurchases: Object.keys(dayCounts).length
+    });
+
+    rangeStart = new Date(rangeEnd);
+  }
+
+  renderTable(results, "#90EE90", "MIDNIGHT_RESET");
+}
+
 /* ---------- RENDER ---------- */
 function renderTable(results, color, mode){
   let displayMode = mode;
 
-  if(mode === "LEGENDS") {
-    displayMode = "OLD_LEGENDS (UPDATED - Only use for rebate inquiry before 12-12-2025)";
-  } else if(mode === "ACORN") {
-    displayMode = "ACORN + LEGENDS";
-    color = "#FFFF00"; // bright yellow for table header
-  }
+  if(mode === "LEGENDS") displayMode = "8am Reset";
+  else if(mode === "ACORN") { displayMode = "Acorn 24hours"; color = "#FFFF00"; }
+  else if(mode === "MIDNIGHT_RESET") displayMode = "Midnight Reset + 24 hours";
 
   const modeLabelColor = mode === "ACORN" ? 'black' : color;
   document.getElementById("modeLabel").innerHTML = `<span style="color:${modeLabelColor}">Results — ${displayMode} Mode</span>`;
@@ -247,7 +292,7 @@ function renderTable(results, color, mode){
     th.style.color = mode === "ACORN" ? 'black' : 'white';
   });
 
-  if(mode === "ACORN") {
+  if(mode === "ACORN" || mode === "MIDNIGHT_RESET") {
     const tds = document.querySelectorAll("#result td");
     tds.forEach(td => td.style.color = 'black');
   }
